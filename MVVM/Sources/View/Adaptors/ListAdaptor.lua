@@ -30,22 +30,28 @@ function ListAdaptor:OnViewModelValueChanged(oldValue, newValue)
 
     if type(self.prefab) == 'function' then--这种用函数生成的prefab内部完全没办法管理，只能全部删掉重新生成
         for i = childCount - 1, 0, -1 do
-            GameObject.Destroy(self.component:GetChild(i).gameObject)
+            local go = self.component:GetChild(i).gameObject
+            go.transform.parent = nil
+            GameObject.Destroy(go)
         end
 
         for i, viewModel in pairs(newValue) do
             local go = GameObject.Instantiate(self:GetPrefab(viewModel))
             go.transform:SetParent(self.component, false)
+            go:SetActive(true)
         end
     else
         if childCount < newCount then
             for i = childCount + 1, newCount do
                 local go = GameObject.Instantiate(self:GetPrefab(newValue[i]))
                 go.transform:SetParent(self.component, false)
+                go:SetActive(true)
             end
         elseif childCount > newCount then
             for i = childCount - 1, newCount, -1 do
-                GameObject.Destroy(self.component:GetChild(i).gameObject)
+                local go = self.component:GetChild(i).gameObject
+                go.transform.parent = nil
+                GameObject.Destroy(go)
             end
         end
     end
@@ -57,12 +63,14 @@ function ListAdaptor:OnViewModelValueChanged(oldValue, newValue)
             view:Set_BindingContext(viewModel)
         end
         UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(go.transform)
+        go:SetActive(true)
     end
     UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.component)
 end
 
 function ListAdaptor:OnAdd(viewModel)
     local go = GameObject.Instantiate(self:GetPrefab(viewModel))
+
     UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(go.transform)
     go.transform:SetParent(self.component, false)
     go.transform:SetAsLastSibling()
@@ -71,12 +79,13 @@ function ListAdaptor:OnAdd(viewModel)
     if view then
         view:Set_BindingContext(viewModel)
     end
-
+    go:SetActive(true)
     UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(self.component)
 end
 
 function ListAdaptor:OnInsert(index, viewModel)
     local go = GameObject.Instantiate(self:GetPrefab(viewModel))
+
     UnityEngine.UI.LayoutRebuilder.ForceRebuildLayoutImmediate(go.transform)
     local beforeHeight = self.component.rect.height
     go.transform:SetParent(self.component, false)
@@ -94,6 +103,7 @@ function ListAdaptor:OnInsert(index, viewModel)
     local anchoredPosition = self.component.anchoredPosition
     anchoredPosition.y = anchoredPosition.y + displacement
     self.component.anchoredPosition = anchoredPosition
+    go:SetActive(true)
 end
 
 function ListAdaptor:OnRemove(index)

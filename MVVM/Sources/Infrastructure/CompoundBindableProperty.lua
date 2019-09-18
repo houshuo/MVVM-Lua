@@ -82,12 +82,13 @@ function CompoundBindableProperty:Set_Value(value)
 end
 
 function CompoundBindableProperty:Get_Value()
-    self:OnContainValueChanged()
+    self:OnContainValueChanged(true)
     local value = self.oldValue
     return value
 end
 
-function CompoundBindableProperty:OnContainValueChanged()
+function CompoundBindableProperty:OnContainValueChanged(onlyCalculateValue)
+    onlyCalculateValue = onlyCalculateValue or false
     if self.func then
         local args = {}
         local properties = rawget(self, 'bindableProperties')
@@ -95,20 +96,21 @@ function CompoundBindableProperty:OnContainValueChanged()
             table.insert(args, property.Value)
         end
         local result = self.func(unpack(args))
+        rawset(self, 'oldValue', result)
 
-        local expiredOnValueChange = {}
-        for _, onValueChanged in pairs(self.OnValueChanged) do
-            local expired = onValueChanged(self.oldValue, result)
-            if expired then
-                table.insert(expiredOnValueChange, onValueChanged)
+        if not onlyCalculateValue then
+            local expiredOnValueChange = {}
+            for _, onValueChanged in pairs(self.OnValueChanged) do
+                local expired = onValueChanged(self.oldValue, result)
+                if expired then
+                    table.insert(expiredOnValueChange, onValueChanged)
+                end
+            end
+
+            for _, expired in pairs(expiredOnValueChange) do
+                table.remove_value(self.OnValueChanged, expired)
             end
         end
-
-        for _, expired in pairs(expiredOnValueChange) do
-            table.remove_value(self.OnValueChanged, expired)
-        end
-
-        rawset(self, 'oldValue', result)
     end
 end
 

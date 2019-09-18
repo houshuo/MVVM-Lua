@@ -4,19 +4,14 @@ VerticalScrollListPosAdaptor = class('VerticalScrollListPosAdaptor', Adaptor)
 
 function VerticalScrollListPosAdaptor:ctor(gameObject, scrollPositionName, binder)
     self.component = gameObject:GetComponent('ScrollRect')
-    binder:RegisterEvent(function(viewModel)
-        local property = viewModel[scrollPositionName]
-        if property == nil then
-            return
-        end
-
+    binder:RegisterEvent(function(viewModel, property)
         self.component.onValueChanged:AddListener(function(pos)
             local normalizedPosition = self.component.verticalNormalizedPosition
             rawset(property, '_value', normalizedPosition)
         end)
     end, function()
         self.component.onValueChanged:RemoveAllListeners()
-    end)
+    end, scrollPositionName)
     self:BindProperty(scrollPositionName, binder)
 end
 
@@ -30,19 +25,14 @@ HorizontalScrollListPosAdaptor = class('HorizontalScrollListPosAdaptor', Adaptor
 
 function HorizontalScrollListPosAdaptor:ctor(gameObject, scrollPositionName, binder)
     self.component = gameObject:GetComponent('ScrollRect')
-    binder:RegisterEvent(function(viewModel)
-        local property = viewModel[scrollPositionName]
-        if property == nil then
-            return
-        end
-
+    binder:RegisterEvent(function(viewModel, property)
         self.component.onValueChanged:AddListener(function(pos)
             local normalizedPosition = self.component.horizontalNormalizedPosition
             rawset(property, '_value', normalizedPosition)
         end)
     end, function()
         self.component.onValueChanged = nil
-    end)
+    end, scrollPositionName)
     self:BindProperty(scrollPositionName, binder)
 end
 

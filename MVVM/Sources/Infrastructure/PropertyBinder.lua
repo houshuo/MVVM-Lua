@@ -3,7 +3,8 @@ PropertyBinder = class('PropertyBinder')
 local function getProperty(viewModel, path)
     local property = viewModel
     local propertyPath = {}
-    for _, name in ipairs(path) do
+    for i = 1, #path - 1 do
+        local name = path[i]
         local bindableProperty = property[name]
         if bindableProperty == nil then
             return nil
@@ -21,7 +22,7 @@ local function getProperty(viewModel, path)
         property = bindableProperty.Value
     end
 
-    return propertyPath
+    return propertyPath, property[path[#path]]
 end
 
 function PropertyBinder:ctor(view)
@@ -31,60 +32,50 @@ function PropertyBinder:ctor(view)
 end
 
 function PropertyBinder:Add(name, valueChangedHandler)
-    local bind = nil
-    local unbind = nil
-    local RebindGen = function(currentPath)
-        local currentPathArray = string.split(currentPath, '.')
-        return function(oldValue, newValue)
-            if oldValue ~= nil then
-                unbind(oldValue, currentPathArray)
-            end
-            bind(newValue, currentPathArray)
-        end
+    local registerFunc = function(viewModel, bindableProperty)
+        table.insert(bindableProperty.OnValueChanged, valueChangedHandler)
+        local value = bindableProperty.Value
+        valueChangedHandler(nil, value) --初始化数据
     end
 
-    local path = string.split(name, '.')
-    local rebinders = {}
-    for i = 1, #path - 1 do
-        table.insert(rebinders, RebindGen(table.concat(path, '.', i + 1)))
+    local unregisterFunc = function(viewModel, bindableProperty)
+        table.remove_value(bindableProperty.OnValueChanged, valueChangedHandler)
     end
 
-    bind = function(viewModel, currentPath)
-        currentPath = currentPath or path
-        local bindableProperties = getProperty(viewModel, currentPath)
-        if bindableProperties==nil then
-            error(string.format("bindableProperty empty! name=%s",name))
-        end
-
-        for i, bindableProperty in ipairs(bindableProperties) do
-            if i < #bindableProperties then
-                table.insert(bindableProperty.OnValueChanged, rebinders[i])
-            else
-                table.insert(bindableProperty.OnValueChanged, valueChangedHandler)
-            end
-        end
-
-        local property = bindableProperties[#bindableProperties]
-        valueChangedHandler(nil, property.Value) --初始化数据
-    end
-
-    unbind = function(viewModel, currentPath)
-        currentPath = currentPath or path
-        local bindableProperties = getProperty(viewModel, currentPath)
-        for i, bindableProperty in ipairs(bindableProperties) do
-            if i < #bindableProperties then
-                table.remove_value(bindableProperty.OnValueChanged, rebinders[i])
-            else
-                table.remove_value(bindableProperty.OnValueChanged, valueChangedHandler)
-            end
-        end
-    end
-
-    table.insert(self._binders, bind)
-    table.insert(self._unbinders, unbind)
+    self:RegisterEvent(registerFunc, unregisterFunc, name)
 end
 
 function PropertyBinder:AddEx(name, onAdd, onInsert, onRemove)--给list用绑定
+    local registerFunc = function(viewModel, bindableProperty)
+        if bindableProperty.AddHandlers then
+            table.insert(bindableProperty.AddHandlers, onAdd)
+        end
+        if bindableProperty.InsertHandlers then
+            table.insert(bindableProperty.InsertHandlers, onInsert)
+        end
+        if bindableProperty.RemoveHandlers then
+            table.insert(bindableProperty.RemoveHandlers, onRemove)
+        end
+    end
+
+    local unregisterFunc = function(viewModel, bindableProperty)
+        if bindableProperty.AddHandlers then
+            table.remove_value(bindableProperty.AddHandlers, onAdd)
+        end
+        if bindableProperty.InsertHandlers then
+            table.remove_value(bindableProperty.InsertHandlers, onInsert)
+        end
+        if bindableProperty.RemoveHandlers then
+            table.remove_value(bindableProperty.RemoveHandlers, onRemove)
+        end
+    end
+
+    self:RegisterEvent(registerFunc, unregisterFunc, name)
+end
+
+function PropertyBinder:RegisterEvent(eventRegisterHandler, eventUnregisterHandler, name)
+    name = name or ''
+
     local bind = nil
     local unbind = nil
     local RebindGen = function(currentPath)
@@ -105,49 +96,26 @@ function PropertyBinder:AddEx(name, onAdd, onInsert, onRemove)--给list用绑定
 
     bind = function(viewModel, currentPath)
         currentPath = currentPath or path
-        local bindableProperties = getProperty(viewModel, currentPath)
+        local bindableProperties, targetValue = getProperty(viewModel, currentPath)
         if bindableProperties==nil then
             error(string.format("bindableProperty empty! name=%s",name))
         end
 
         for i, bindableProperty in ipairs(bindableProperties) do
-            if i < #bindableProperties then
-                table.insert(bindableProperty.OnValueChanged, rebinders[i])
-            else
-                local bindableProperty = bindableProperties[#bindableProperties]
-                table.insert(bindableProperty.AddHandlers, onAdd)
-                table.insert(bindableProperty.InsertHandlers, onInsert)
-                table.insert(bindableProperty.RemoveHandlers, onRemove)
-            end
+            table.insert(bindableProperty.OnValueChanged, rebinders[i])
+            viewModel = bindableProperty
         end
+        eventRegisterHandler(viewModel, targetValue)
     end
 
     unbind = function(viewModel, currentPath)
         currentPath = currentPath or path
-        local bindableProperties = getProperty(viewModel, currentPath)
+        local bindableProperties, targetValue = getProperty(viewModel, currentPath)
         for i, bindableProperty in ipairs(bindableProperties) do
-            if i < #bindableProperties then
-                table.remove_value(bindableProperty.OnValueChanged, rebinders[i])
-            else
-                local bindableProperty = bindableProperties[#bindableProperties]
-                table.remove_value(bindableProperty.AddHandlers, onAdd)
-                table.remove_value(bindableProperty.InsertHandlers, onInsert)
-                table.remove_value(bindableProperty.RemoveHandlers, onRemove)
-            end
+            table.remove_value(bindableProperty.OnValueChanged, rebinders[i])
+            viewModel = bindableProperty
         end
-    end
-
-    table.insert(self._binders, bind)
-    table.insert(self._unbinders, unbind)
-end
-
-function PropertyBinder:RegisterEvent(eventRegisterHandler, eventUnregisterHandler)
-    local bind = function(viewModel)
-        eventRegisterHandler(viewModel)
-    end
-
-    local unbind = function(viewModel)
-        eventUnregisterHandler(viewModel)
+        eventUnregisterHandler(viewModel, targetValue)
     end
 
     table.insert(self._binders, bind)

@@ -3,12 +3,7 @@ require 'MVVM.Sources.View.Adaptor'
 SliderAdaptor = class('SliderAdaptor', Adaptor)
 function SliderAdaptor:ctor(gameObject, sliderValueProperty, onSliderChangedProperty, binder)
     self.component = gameObject:GetComponent('Slider')
-    binder:RegisterEvent(function(viewModel)
-        local property = viewModel[sliderValueProperty]
-        if property == nil then
-            return
-        end
-
+    binder:RegisterEvent(function(viewModel, property)
         self.component.onValueChanged:AddListener(function()
             local value = self.component.value
             rawset(property, '_value', value)
@@ -22,7 +17,7 @@ function SliderAdaptor:ctor(gameObject, sliderValueProperty, onSliderChangedProp
         end)
     end, function()
         self.component.onValueChanged:RemoveAllListeners()
-    end)
+    end, sliderValueProperty)
     self:BindProperty(sliderValueProperty, binder)
 end
 
